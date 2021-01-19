@@ -49,7 +49,7 @@ typedef signed long long int s64;
   #include "gp2x/gp2x_common.h"
 #endif
 
-#define TEMPER_VERSION "1.25 Gameblabla " __DATE__ " "
+#define TEMPER_VERSION "1.24.2 GCW"
 #define CD_SWAP_OPTION
 #define FASTFORWARD_FRAMESKIP
 #define FASTFORWARD_FRAMESKIP_RATE 4
@@ -283,7 +283,7 @@ typedef struct
 #include "bin_cue.h"
 
 
-#if defined(LINUX_PLATFORM) || defined(GCW_BUILD)
+#ifdef LINUX_PLATFORM
 
 #include <fcntl.h>
 #include <strings.h>
@@ -309,8 +309,6 @@ typedef struct
 #include <winsock.h>
 
 #endif
-
-extern u32 isrunning;
 
 #endif
 

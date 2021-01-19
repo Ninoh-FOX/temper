@@ -34,7 +34,7 @@ void update_events(void)
 
   u32 talk_message_limit =
    (SCREEN_WIDTH_NARROW_CHARS * 2) - (strlen(config.netplay_username) + 2);
-   
+
   while(update_input(&event_input))
   {
     if(talk_mode)
@@ -156,7 +156,7 @@ void update_events(void)
             else
             {
               u16 *screen_capture = malloc(320 * 240 * sizeof(u16));
-              copy_screen(screen_capture, 320, 240);
+              copy_screen(screen_capture);
               save_state(state_name, screen_capture);
               free(screen_capture);
             }

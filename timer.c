@@ -76,26 +76,11 @@ s32 add_cycles;
 void execute_instructions_compatible(u32 count);
 void execute_instructions_fast(u32 count);
 
-#ifdef ARM_FAST
-
-#define execute_instructions(count)                                           \
-    execute_instructions_fast(count);                                   \
-
-#elif defined(ARM_COMPAT)
-
-#define execute_instructions(count)                                           \
-    execute_instructions_compatible(count);                                   \
-    
-#else
-
 #define execute_instructions(count)                                           \
   if(config.compatibility_mode)                                               \
     execute_instructions_compatible(count);                                   \
   else                                                                        \
-    execute_instructions_fast(count);                                         \
-    
-#endif  
-  
+    execute_instructions_fast(count)                                          \
 
 #endif
 

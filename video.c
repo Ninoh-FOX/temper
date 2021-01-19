@@ -3,15 +3,6 @@
 
 // Put temp debug vars here
 
-/*
- * Here's how it's calculated according to pcetech.txt :
- * The frame counter offset is the substration of VDS and VSW.
- * We set it to 14 because that was the default in Temper
- * but obviously it should be calculated as such when VDS/VSW change
- * as it's done below.
-*/
-static u32 frame_counter_offset = 14;
-
 #define	RGB(r, g, b)	((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3))
 
 //u64 scanline_cycle_counter;
@@ -37,7 +28,6 @@ vpc_struct vpc;
 void update_satb(vdc_struct *vdc);
 void vdc_vram_dma_line(vdc_struct *vdc);
 
-/* Gameblabla - Make sure that SDL can adjust the video size here (max should be 512x256) */
 static void vdc_update_width(vdc_struct *vdc)
 {
   s32 screen_width = (vdc->hdw + 1) * 8;
@@ -602,7 +592,6 @@ void reset_vdc(vdc_struct *vdc)
   vdc->vsw = 0x02;
   vdc->vds = 0x0F;
   vdc->vdw = 0xFF;
-  // pcetech.txt says max should be 0xC0
   vdc->vcr = 0xFF;
 
   vdc->display_counter = 0;
@@ -631,7 +620,7 @@ void reset_vdc(vdc_struct *vdc)
 
 vce_struct vce;
 
-/* We might need an 8bpp renderer but most of Temper assumes a 16bpp buffer... */
+
 void initialize_palette_convert()
 {
 	/*FILE* fp;
@@ -756,50 +745,12 @@ void vce_control_write(u32 value)
       break;
   }
 
-#ifdef IPU_SCALING
-	vce.screen_center_offset = 0;
-#else
-	vce.screen_center_offset = (RESOLUTION_WIDTH - vce.screen_width) / 2;
-#endif
-	
+  vce.screen_center_offset = (RESOLUTION_WIDTH - vce.screen_width) / 2;
+
   vdc_update_width(&vdc_a);
 
   if(config.sgx_mode)
     vdc_update_width(&vdc_b);
-    
-	frame_counter_offset = vdc_a.vds + vdc_a.vsw;
-#ifdef IPU_SCALING
-	u32 height;
-	#ifdef CRC_CHECK
-	if (height_crop > 0)
-	{
-		height = height_crop;
-		frame_counter_offset = framecounter_force;
-	}
-	else
-	#endif
-	{
-		/* Gameblabla : How is it exactly done ? Get more info about it. TODO */
-		switch(vdc_a.vds)
-		{
-			// case 0xF:
-			default:
-				height = 240;
-			break;
-			case 0xE:
-			case 0x17:
-				height = 224;
-			break;
-			case 0x25:
-				height = 192;
-			break;
-		}
-	}
-	/*printf("vdc_a.vds 0x%x\n",  vdc_a.vds);
-	printf("vdc_a.vsw 0x%x\n",  vdc_a.vsw);
-	printf("frame_counter_offset %d\n",  frame_counter_offset);*/
-	set_screen_resolution(vce.screen_width, height, 1);
-#endif
 
   // Interlace bit determines how many scanlines there are.
   if(value & 0x4)
@@ -960,7 +911,7 @@ void initialize_video()
   initialize_vce();
   initialize_vpc();
 
-  set_screen_resolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, 1);
+  set_screen_resolution(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
   clear_screen();
 }
 
@@ -1682,20 +1633,14 @@ do                                                                            \
   }                                                                           \
 
 
-/*
-	Gameblabla : Tentative fix for Axelay Demo for SGX. (Background still doesn't get masked off though)
-	if (left_offset_block != 0) {obj_high_transparency_mask_dest[left_offset_block - 1] = 0; \
-	obj_low_transparency_mask_dest[left_offset_block - 1] = 0;}                \
-*/
-
 #define render_spr_line_clamp_edges()                                         \
   if(vdc->scanline_offset > 0)                                                \
   {                                                                           \
     u32 left_offset_block = vdc->scanline_offset / 32;                        \
     u32 left_offset_pixels = vdc->scanline_offset % 32;                       \
                                                                               \
-	if (left_offset_block != 0) {obj_high_transparency_mask_dest[left_offset_block - 1] = 0; \
-	obj_low_transparency_mask_dest[left_offset_block - 1] = 0;}                \
+    obj_high_transparency_mask_dest[left_offset_block - 1] = 0;               \
+    obj_low_transparency_mask_dest[left_offset_block - 1] = 0;                \
     if(left_offset_pixels)                                                    \
     {                                                                         \
       u32 left_offset_mask = 0xFFFFFFFF << left_offset_pixels;                \
@@ -2221,17 +2166,14 @@ void vdc_render_line(vdc_struct *vdc, u8 **bg_buffer, u32 **bg_mask_buffer,
     }
   }
 }
+ 
 
 void render_line(void)
 {
-  if((vce.frame_counter >= frame_counter_offset) &&
-#ifdef IPU_SCALING
-   (vce.frame_counter < (frame_counter_offset + Get_Video_Height())))
-#else
-   (vce.frame_counter < (frame_counter_offset + RESOLUTION_HEIGHT)))
-#endif
+  if((vce.frame_counter >= 14) &&
+   (vce.frame_counter < (14 + RESOLUTION_HEIGHT)))
   {
-    u32 scanline_line = (vce.frame_counter - frame_counter_offset);
+    u32 scanline_line = vce.frame_counter - 14;
 
     // Pad by 32 on either side to allow rendering off the edges. In reality,
     // only 16 pixels are needed, but 32 are given so that everything stays aligned
@@ -2251,7 +2193,6 @@ void render_line(void)
     vdc_render_line(&vdc_a, &bg_buffer, &bg_mask_buffer,
      &obj_buffer, obj_low_mask_buffer + 1, obj_high_mask_buffer + 1);
 
-#ifndef IPU_SCALING
     if(config.scale_width)
     {
       switch(vce.screen_width)
@@ -2274,7 +2215,6 @@ void render_line(void)
       vce.pixels_drawn[scanline_line] = RESOLUTION_WIDTH;
     }
     else
-#endif
     {
       if(vce.screen_width < vce.pixels_drawn[scanline_line])
       {
@@ -2299,14 +2239,10 @@ void render_line_sgx(void)
     vpc.windows_dirty = 0;
   }
 
-  if((vce.frame_counter >= frame_counter_offset) &&
-#ifdef IPU_SCALING
-   (vce.frame_counter < (frame_counter_offset + Get_Video_Height())))
-#else
-   (vce.frame_counter < (frame_counter_offset + RESOLUTION_HEIGHT)))
-#endif
+  if((vce.frame_counter >= 14) &&
+   (vce.frame_counter < (14 + RESOLUTION_HEIGHT)))
   {
-    u32 scanline_line = vce.frame_counter - frame_counter_offset;
+    u32 scanline_line = vce.frame_counter - 14;
 
     // Pad by 32 on either side to allow rendering off the edges. In reality,
     // only 16 pixels are needed, but 32 are given so that everything stays aligned
@@ -2335,7 +2271,6 @@ void render_line_sgx(void)
     vdc_render_line(&vdc_b, &bg_buffer_b, &bg_mask_buffer_b,
      &obj_buffer_b, obj_low_mask_buffer_b + 1, obj_high_mask_buffer_b + 1);
 
-#ifndef IPU_SCALING
     if(config.scale_width)
     {
       switch(vce.screen_width)
@@ -2367,7 +2302,6 @@ void render_line_sgx(void)
       vce.pixels_drawn[scanline_line] = RESOLUTION_WIDTH;
     }
     else
-#endif
     {
       if(vce.screen_width < vce.pixels_drawn[scanline_line])
       {

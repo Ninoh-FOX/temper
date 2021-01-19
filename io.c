@@ -84,16 +84,6 @@ void reset_io()
   }
 }
 
-void reset_io_buttons()
-{
-  u32 i;
-
-  for(i = 0; i < 5; i++)
-  {
-    io.button_status[i] = 0xFFF;
-  }
-}
-
 #define io_savestate_extra_load()                                             \
   if(config.cd_loaded == 0)                                                   \
     io.port |= 0x80;                                                          \

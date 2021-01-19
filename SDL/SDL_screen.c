@@ -7,13 +7,8 @@
 
 SDL_Surface *screen = NULL;
 SDL_Surface *real_screen = NULL;
-SDL_Surface *menu_screen = NULL;
 u32 last_scale_factor;
 u8 *real_screen_pixels;
-
-#ifdef IPU_SCALING
-u32 game_width = 0, game_height = 0;
-#endif
 
 #ifdef SDL_OPENGL_BLIT
 
@@ -43,6 +38,9 @@ void bind_texture(void)
 
 void update_screen()
 {
+  if(last_scale_factor != config.scale_factor)
+    set_screen_resolution(320, 240);
+
 #ifdef SDL_OPENGL_BLIT
   if(config.use_opengl)
   {
@@ -78,24 +76,8 @@ void update_screen()
   }
 }
 
-void set_screen_resolution(u32 width, u32 height, u32 game)
+void set_screen_resolution(u32 width, u32 height)
 {
-#ifdef IPU_SCALING
-	if (game == 1)
-	{
-		if (screen != NULL)
-		{
-			if (width == screen->w && height == screen->h) return;
-		}
-		game_width = width;
-		game_height = height;
-		for(uint32_t i = 0; i < 242; i++)
-		{
-			vce.pixels_drawn[i] = width;
-		}
-	}
-#endif
-	
 #ifdef SDL_OPENGL_BLIT
   if(config.use_opengl)
   {
@@ -138,54 +120,53 @@ void set_screen_resolution(u32 width, u32 height, u32 game)
 #endif
   {
     u16 *old_pixels = NULL;
-    
-#ifdef IPU_SCALING
-    if (menu_screen == NULL)
-    {
-		menu_screen = SDL_CreateRGBSurface(SDL_SWSURFACE, 320, 240, 16, 0,0,0,0);
-	}
-#endif
 
     if(screen != NULL)
     {
-#ifdef IPU_SCALING
-		SDL_SoftStretch(screen, NULL, menu_screen, NULL);
-#else
-	  old_pixels = malloc((width * height) * 2);
-      copy_screen(old_pixels, width, height);
-#endif
+      old_pixels = malloc(320 * 240 * 2);
+      copy_screen(old_pixels);
       SDL_FreeSurface(screen);
     }
 
-#ifndef IPU_SCALING
-	screen = SDL_SetVideoMode(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, 16, SDL_HWSURFACE);
-#else
-	screen = SDL_SetVideoMode(width, height, 16, SDL_HWSURFACE
+    switch(config.scale_factor)
+    {
+      case SCALE_FULLSCREEN:
+        screen = SDL_SetVideoMode(320, 240, 16,
 #ifdef SDL_TRIPLEBUF
-	| SDL_TRIPLEBUF
-#endif
-	);
-#endif	
-	if (screen == NULL)
-	{
-		printf("SDL_Init failed: %s\n", SDL_GetError());
-	}
-
-#ifdef IPU_SCALING
-	if (menu_screen != NULL && screen != NULL) SDL_SoftStretch(menu_screen, NULL, screen, NULL);
-	real_screen_pixels = screen->pixels;
+		 SDL_HWSURFACE | SDL_TRIPLEBUF
 #else
-	real_screen_pixels = screen->pixels;
-	if(old_pixels != NULL)
-	{
-		blit_screen(old_pixels);
-		free(old_pixels);
-	}
+		 SDL_HWSURFACE | SDL_DOUBLEBUF
 #endif
+         );
+        real_screen_pixels = screen->pixels;
+
+        if(old_pixels != NULL)
+          blit_screen(old_pixels);
+
+        break;
+
+      default:
+        screen = SDL_SetVideoMode(width, height, 16, 
+#ifdef SDL_TRIPLEBUF
+		SDL_HWSURFACE | SDL_TRIPLEBUF
+#else
+		SDL_HWSURFACE | SDL_DOUBLEBUF
+#endif
+		);
+  
+        if(old_pixels != NULL)
+          blit_screen(old_pixels);
+	break;
+    }
+
+    if(old_pixels != NULL)
+      free(old_pixels);
+
     last_scale_factor = config.scale_factor;
   }
 
-  //SDL_WM_SetCaption("Temper PC-Engine Emulator", "Temper");
+
+  SDL_WM_SetCaption("Temper PC-Engine Emulator", "Temper");
 }
 
 void *get_screen_ptr()
@@ -203,7 +184,7 @@ u32 get_screen_pitch()
   if(config.use_opengl)
     return 320;
 
-  return (screen->w);
+  return (screen->pitch / 2);
 }
 
 void clear_screen()
@@ -212,9 +193,9 @@ void clear_screen()
   u32 pitch = get_screen_pitch();
   u16 *pixels = get_screen_ptr();
 
-  for(i = 0; i < screen->h; i++)
+  for(i = 0; i < 240; i++)
   {
-    memset(pixels, 0, screen->w * 2);
+    memset(pixels, 0, 320 * 2);
     pixels += pitch;
   }
 }
@@ -257,31 +238,3 @@ void clear_all_buffers()
 {
 }
 
-void Kill_video()
-{
-	/*if (screen != NULL)
-	{
-		SDL_FreeSurface(screen);
-	}*/
-	
-	if (real_screen != NULL)
-	{
-		SDL_FreeSurface(real_screen);
-		real_screen = 0;
-	}
-	
-	#ifdef IPU_SCALING
-	if (menu_screen != NULL)
-	{
-		SDL_FreeSurface(menu_screen);
-		menu_screen = 0;
-	}
-	#endif
-}
-
-#ifdef IPU_SCALING
-int Get_Video_Height()
-{
-	return screen->h;
-}
-#endif

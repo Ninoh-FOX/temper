@@ -309,11 +309,5 @@ void reset_memory();
   memory.mpr_translated[(offset + 0x8)] = (mpr_value) - ((offset) << 12)      \
 
 
-#ifdef IPU_SCALING
-#ifdef CRC_CHECK
-extern u32 height_crop, framecounter_force;
-#endif
-#endif
-
 #endif
 

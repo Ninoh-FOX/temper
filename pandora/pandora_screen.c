@@ -54,7 +54,7 @@ void update_screen()
   }
 }
 
-void set_screen_resolution(u32 width, u32 height, u32 game)
+void set_screen_resolution(u32 width, u32 height)
 {
   u16 *fb_pixels_double;
 

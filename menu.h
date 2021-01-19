@@ -156,8 +156,7 @@ menu_struct *create_menu(u32 num_options, menu_struct *parent_menu,
  draw_menu_function_type draw_function, focus_menu_function_type 
  focus_function);
 
-//#define MAX_CONTROLS 128
-#define MAX_CONTROLS 16
+#define MAX_CONTROLS 128
 
 extern const char *control_config_exit_string;
 extern const char *control_config_string;

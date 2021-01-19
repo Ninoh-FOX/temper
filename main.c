@@ -1,7 +1,5 @@
 #include "common.h"
 
-u32 isrunning = 1;
-
 void setup_main_dirs()
 {
   struct stat sb;
@@ -237,7 +235,7 @@ u32 process_arguments(int argc, char *argv[])
             break;
 
           case 4:
-            strncpy(config.netplay_username, optarg, 32);
+            strncpy(config.netplay_username, optarg, 128);
             printf("Setting netplay username to %s\n", config.netplay_username);
             break;
 
@@ -326,13 +324,13 @@ int main(int argc, char *argv[])
   
 	if (strstr(argv[1], ".bin") || strstr(argv[1], ".iso") )
 	{
-		return 1;
+		return;
 	}
 
     if(load_rom(argv[argc - 1]) == -1)
     {
       printf("Error: Could not load %s\n", argv[1]);
-      return 1;
+      return -1;
     }
     reset_pce();
   }
@@ -370,7 +368,7 @@ int main(int argc, char *argv[])
   if(netplay.pause == 0)
     audio_unpause();
 
-  while(isrunning)
+  while(1)
   {
     if(netplay.active && netplay.pause)
     {
@@ -417,8 +415,6 @@ int main(int argc, char *argv[])
       }
     }
   }
-  
-	quit();
 
   return 0;
 }
@@ -949,11 +945,7 @@ void save_config_file(char *file_name)
 
   file_write_mem_save(config_file);
   file_write_mem_close(config_file);
-  if (config_file_buffer)
-  {
-	  free(config_file_buffer);
-	  config_file_buffer = NULL;
-  }
+  free(config_file_buffer);
 }
 
 void save_directory_config_file(char *file_name)
@@ -984,11 +976,7 @@ void save_directory_config_file(char *file_name)
 
   file_write_mem_save(config_file);
   file_write_mem_close(config_file);
-  if (config_file_buffer)
-  {
-	  free(config_file_buffer);
-	  config_file_buffer = NULL;
-  }
+  free(config_file_buffer);
 }
 
 s32 load_config_file(char *file_name)
@@ -1244,8 +1232,9 @@ void quit()
   save_directory_config_file("temper.cf2");
 
   audio_exit();
-  Kill_video();
   platform_quit();
+
+  exit(0);
 }
 
 void status_message_raw(char *message)
