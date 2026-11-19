@@ -1,0 +1,62 @@
+# PCE emulator makefile
+# Gilead Kutnick - Exophase
+
+# Global definitions
+# Koriki (Miyoo Mini): Cortex-A7 toolchain; Mini buttons translated by koriki_keys.h
+TC        = /opt/miyoomini-toolchain/bin/arm-linux-gnueabihf-
+SYSROOT   = /opt/miyoomini-toolchain/arm-miyoomini-linux-gnueabihf/sysroot
+KORIKI_HEADERS ?= ../../koriki-headers
+AS        = $(TC)gcc
+CC        = $(TC)gcc
+STRIP     = $(TC)strip --strip-all --remove-section=.comment  --remove-section=.note
+
+FAST_BUILD ?= 0 # 0 - compatible asm opt / 1 - fast assembly code
+
+OBJS      = main.o cpu.o
+ifeq ($(FAST_BUILD),1)
+OBJS      += cpu_arm_fast.o
+else
+OBJS      += cpu_arm_compatible.o
+endif
+OBJS      += memory.o irq.o io.o video.o timer.o psg.o disasm.o    \
+            screen.o event.o audio.o menu.o debug.o cd.o adpcm.o netplay.o     \
+            arcade_card.o bin_cue.o                                         \
+            SDL_main.o SDL_screen.o SDL_event.o SDL_menu.o SDL_audio.o crc32.o \
+			bitwise.o block.o codebook.o floor0.o floor1.o framing.o \
+			info.o mapping0.o mdct.o registry.o res012.o sharedbook.o \
+			synthesis.o vorbisfile.o window.o
+BIN       ?= temper
+
+# Platform specific definitions
+PKGS_CFLAGS = -I$(SYSROOT)/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT
+PKGS_LIBS = $(SYSROOT)/usr/lib/libSDL_image-1.2.so.0 -lSDL -lpthread -lz -lm
+
+VPATH      += .. ../arm ../SDL ../linux ../tremor
+CFLAGS     += -DBITTBOY_BUILD -D_MIYOO_ -DNO_VOL_CTRL -DNO_CUREXIT_QUIT
+ifeq ($(FAST_BUILD),1)
+CFLAGS     += -DARM_FAST
+else
+CFLAGS     += -DARM_COMPAT
+endif
+CFLAGS     += -O2 -marm -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -fno-PIC
+CFLAGS     += -DKORIKI -I$(KORIKI_HEADERS) -DKORIKI_MENU_KEY=SDLK_END -include $(KORIKI_HEADERS)/koriki_keys.h
+CFLAGS     += $(PKGS_CFLAGS)
+INCLUDES   = -I.. -I../tremor
+LIBS       = $(PKGS_LIBS) $(SYSROOT)/usr/lib/libbz2.a -Wl,--as-needed -Wl,--gc-sections -s
+
+# Compilation:
+
+.SUFFIXES: .c .S
+
+%.o: %.c
+	${CC} ${CFLAGS} ${INCLUDES} -c -o $@ $< ${LIBS}
+
+%.o: %.S
+	${AS} ${CFLAGS} -c -o $@ $<
+
+all:	${OBJS}
+	${CC} ${OBJS} -o ${BIN} ${LIBS}
+	${STRIP} ${BIN}
+
+clean:
+	rm -f *.o ${BIN} 
